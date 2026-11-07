@@ -1,0 +1,53 @@
+services:
+  ars-factory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ars-factory-app
+    restart: unless-stopped
+    ports:
+      - "4001:4001"
+    environment:
+      - PORT=4001
+      - HOST=0.0.0.0
+      - NODE_ENV=production
+      - REDIS_URL=redis://ars-factory-redis:6379
+      - STORAGE_PATH=/app/data/artifacts
+      - SERVICE_NAME=ars-factory
+      - LOG_LEVEL=info
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - factory-artifacts:/app/data/artifacts
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4001/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - ars-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: ars-factory-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - factory-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - ars-network
+
+volumes:
+  factory-artifacts:
+  factory-redis-data:
+
+networks:
+  ars-network:
+    driver: bridge
