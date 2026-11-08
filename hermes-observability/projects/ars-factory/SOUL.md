@@ -23,3 +23,4 @@ DIRETRIZES TÉCNICAS:
   "root_cause": "...",
   "recommended_actions": [...]
 }
+

@@ -31,3 +31,4 @@ for proj in "${PROJECTS[@]}"; do
         fi
     fi
 done
+

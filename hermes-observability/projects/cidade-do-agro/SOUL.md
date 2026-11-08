@@ -26,3 +26,4 @@ DIRETRIZES TÉCNICAS E AGRONÔMICAS:
   "root_cause": "...",
   "recommended_actions": [...]
 }
+

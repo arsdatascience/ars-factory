@@ -1,0 +1,10 @@
+Serviço / Dashboard	URL de Acesso	Status HTTP	Resposta
+Grafana Home	https://grafana.arsdatascience.com	200 OK	Operacional (50.3 KB)
+Node Exporter Full	https://grafana.arsdatascience.com/d/rYdddlPWk/node-exporter-full	200 OK	Operacional (Otimizado)
+SOC & Cybersecurity	https://grafana.arsdatascience.com/d/cybersecurity-threat-soc/...	200 OK	Operacional (Loki + Redis)
+cAdvisor Exporter	https://grafana.arsdatascience.com/d/pMEd7m0Mz/cadvisor-exporter	200 OK	Operacional (< 1ms)
+ContDigital Platform 360	https://grafana.arsdatascience.com/d/contdigital-platform-360/...	200 OK	Operacional (Sondas Vivas)
+Central de Logs (Loki)	https://grafana.arsdatascience.com/d/docker-logs-explorer/...	200 OK	Operacional (Filtro Severidade)
+Painel Coolify	https://coolify.arsdatascience.com	200 OK	Operacional
+Ars Factory (App)	https://factory.arsdatascience.com	200 OK	Operacional (Node/TS)
+Uptime Kuma	https://uptime.arsdatascience.com	200 OK	Operacional

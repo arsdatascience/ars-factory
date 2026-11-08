@@ -25,3 +25,4 @@ DIRETRIZES TÉCNICAS E CLIMATOLÓGICAS:
   "root_cause": "...",
   "recommended_actions": [...]
 }
+

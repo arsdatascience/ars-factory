@@ -24,3 +24,4 @@ DIRETRIZES TÉCNICAS E FINANCEIRAS:
   "root_cause": "...",
   "recommended_actions": [...]
 }
+

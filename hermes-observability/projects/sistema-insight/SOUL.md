@@ -27,3 +27,4 @@ DIRETRIZES TÉCNICAS E BIOMÉDICAS:
   "root_cause": "...",
   "recommended_actions": [...]
 }
+
