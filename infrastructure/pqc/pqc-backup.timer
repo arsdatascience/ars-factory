@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Post-Quantum Multi-Project Database and Server Backup
+After=network-online.target
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
