@@ -54,3 +54,4 @@ buildRoutes.get("/builds/:id/artifact", (c) => {
     generatedAt: build.completedAt
   });
 });
+

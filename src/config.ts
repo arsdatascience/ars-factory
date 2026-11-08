@@ -14,3 +14,4 @@ export const config = {
   apiSecretToken: process.env.API_SECRET_TOKEN || "",
   isProduction: process.env.NODE_ENV === "production"
 };
+

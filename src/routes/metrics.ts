@@ -126,3 +126,4 @@ metricsRoutes.get("/api/v1/monitoring/services", (c) => {
     ]
   });
 });
+

@@ -54,3 +54,4 @@ A aplicação **Ars Factory** já inclui nativamente os endpoints exigidos pelos
   - Nome: `factory` (para `factory.arsdatascience.com`)
   - Conteúdo: `177.104.141.223`
   - Proxy: `Habilitado (Nuvem Laranja)` para proteção DDoS e terminação SSL Cloudflare.
+

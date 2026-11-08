@@ -24,3 +24,4 @@ healthRoutes.get("/ready", (c) => {
     timestamp: new Date().toISOString()
   });
 });
+

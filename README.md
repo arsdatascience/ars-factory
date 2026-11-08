@@ -93,3 +93,4 @@ O dashboard estará disponível em `http://localhost:4001`.
 5. **Porta:** `4001`
 6. **Healthcheck:** `/health`
 7. **Documentação completa de monitoramento:** Consulte [docs/MONITORING.md](docs/MONITORING.md).
+
