@@ -7,6 +7,7 @@ import { taskRoutes } from "./routes/tasks.js";
 import { buildRoutes } from "./routes/builds.js";
 import { metricsRoutes } from "./routes/metrics.js";
 import { renderDashboardHtml } from "./ui.js";
+import { initDatabase } from "./db/index.js";
 
 const app = new Hono();
 
@@ -46,6 +47,11 @@ app.notFound((c) => {
 app.onError((err, c) => {
   logger.error({ error: err.message, stack: err.stack }, "Unhandled exception");
   return c.json({ error: "Internal Server Error", message: err.message }, 500);
+});
+
+// Initialize PostgreSQL / TimescaleDB Persistent Tables
+initDatabase().catch((err) => {
+  logger.warn({ err }, "Database initialization deferred.");
 });
 
 // Server Startup
