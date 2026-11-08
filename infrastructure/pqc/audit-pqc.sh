@@ -104,8 +104,9 @@ fi
 # 5. Restic e Cloudflare R2
 echo -e "\n[5/5] Verificando Repositorio Restic e Snapshots..."
 if [[ -f /etc/restic/env && -f /etc/restic/repo.pw ]]; then
-    SNAPSHOT_COUNT=$(sudo bash -c 'source /etc/restic/env 2>/dev/null && restic snapshots --json 2>/dev/null' | grep -o '"id":' | wc -l || echo "0")
-    if [[ $SNAPSHOT_COUNT -gt 0 ]]; then
+    SNAPSHOT_COUNT=$(sudo bash -c 'source /etc/restic/env 2>/dev/null && restic snapshots --json 2>/dev/null' | grep -c '"id":' || true)
+    SNAPSHOT_COUNT=$(echo "$SNAPSHOT_COUNT" | head -n1 | tr -dc '0-9')
+    if [[ -n "$SNAPSHOT_COUNT" && "$SNAPSHOT_COUNT" -gt 0 ]]; then
         echo -e "  ${GREEN}[OK]${NC} Repositório Cloudflare R2 conectado ($SNAPSHOT_COUNT snapshots verificados)."
     else
         echo -e "  ${YELLOW}[AVISO]${NC} Repositório Restic inicializado, aguardando primeiro snapshot finalizar."
