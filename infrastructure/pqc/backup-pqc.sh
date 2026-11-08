@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ========================================================
 # PQC ENTERPRISE RESTIC MULTI-PROJECT BACKUP ENGINE
-# Servidor EVEO - Zero Downtime & High Integrity
+# Servidor EVEO - Zero Downtime, High Performance & Integrity
 # ========================================================
 set -euo pipefail
 
@@ -27,11 +27,12 @@ mkdir -p "$APPS_DB_DIR"
 chmod 700 "$BACKUP_STAGE" "$APPS_DB_DIR"
 
 cleanup() {
+    echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Limpando area de staging temporaria..."
     rm -rf "${BACKUP_STAGE:?}"/* 2>/dev/null || true
 }
 trap cleanup EXIT
 
-echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] 1. Identificando e extraindo dumps de bancos de dados relacionais e grafos..."
+echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] 1. Identificando e extraindo dumps de bancos de dados..."
 
 DUMPED_COUNT=0
 
@@ -48,7 +49,7 @@ for cid in $(docker ps -q); do
 
     # Identifica containers PostgreSQL / TimescaleDB
     if echo "$cimage" | grep -qiE 'postgres|timescale' || echo "$cenv" | grep -q '^POSTGRES_'; then
-        echo "  [PG/Timescale] Processando banco no container: $cname ($cimage)"
+        echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')]   [PG/Timescale] Iniciando dump do container: $cname ($cimage)"
         
         pg_user=$(echo "$cenv" | grep '^POSTGRES_USER=' | cut -d'=' -f2- | head -n1 || true)
         pg_pw=$(echo "$cenv" | grep '^POSTGRES_PASSWORD=' | cut -d'=' -f2- | head -n1 || true)
@@ -63,32 +64,32 @@ for cid in $(docker ps -q); do
 
         target_dump="${APPS_DB_DIR}/pg_${cname}.sql.gz"
         
-        # Executa dump com baixa prioridade de CPU e disco (ionice idle)
+        # Executa dump com pigz multi-thread (-1 rapido) com nice/ionice
         nice -n 19 ionice -c 3 docker exec -e PGPASSWORD="${pg_pw}" "$cid" \
-            pg_dumpall -h 127.0.0.1 -U "${pg_user}" --clean 2>/dev/null | gzip -9 > "$target_dump" || {
-                # Fallback: tenta dump direto via socket local se localhost falhar
+            pg_dumpall -h 127.0.0.1 -U "${pg_user}" --clean 2>/dev/null | pigz -p 4 -1 > "$target_dump" || {
+                # Fallback via socket se localhost falhar
                 nice -n 19 ionice -c 3 docker exec -e PGPASSWORD="${pg_pw}" "$cid" \
-                    pg_dumpall -U "${pg_user}" --clean 2>/dev/null | gzip -9 > "$target_dump" || true
+                    pg_dumpall -U "${pg_user}" --clean 2>/dev/null | pigz -p 4 -1 > "$target_dump" || true
             }
 
         if [[ -s "$target_dump" ]]; then
             fsize=$(du -h "$target_dump" | cut -f1)
-            echo "    [OK] Dump concluido: $target_dump ($fsize)"
+            echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')]     [OK] Dump concluido: $target_dump ($fsize)"
             DUMPED_COUNT=$((DUMPED_COUNT + 1))
         else
-            echo "    [AVISO] Dump falhou ou vazio para $cname"
+            echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')]     [AVISO] Dump falhou ou vazio para $cname"
             rm -f "$target_dump"
         fi
     fi
 
     # Identifica containers Neo4j
     if echo "$cimage" | grep -qi 'neo4j'; then
-        echo "  [Neo4j] Processando container de grafo: $cname"
+        echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')]   [Neo4j] Iniciando dump do container de grafo: $cname"
         target_dump="${APPS_DB_DIR}/neo4j_${cname}.tar.gz"
         nice -n 19 ionice -c 3 docker exec "$cid" tar -czf - /data 2>/dev/null > "$target_dump" || true
         if [[ -s "$target_dump" ]]; then
             fsize=$(du -h "$target_dump" | cut -f1)
-            echo "    [OK] Dump Neo4j concluido: $target_dump ($fsize)"
+            echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')]     [OK] Dump Neo4j concluido: $target_dump ($fsize)"
             DUMPED_COUNT=$((DUMPED_COUNT + 1))
         else
             rm -f "$target_dump"
@@ -96,7 +97,7 @@ for cid in $(docker ps -q); do
     fi
 done
 
-echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Total de bancos de dados dumpados: $DUMPED_COUNT"
+echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Total de bancos de dados dumpados com sucesso: $DUMPED_COUNT"
 
 echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] 2. Enviando snapshot criptografado PQC para o Cloudflare R2..."
 

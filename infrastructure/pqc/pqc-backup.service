@@ -1,0 +1,13 @@
+[Unit]
+Description=Post-Quantum Multi-Project Database and Server Backup
+After=network.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/backup-pqc.sh
+StandardOutput=append:/var/log/restic-backup.log
+StandardError=append:/var/log/restic-backup.log
+TimeoutStartSec=7200
+
+[Install]
+WantedBy=multi-user.target
