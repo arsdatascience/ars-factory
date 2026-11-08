@@ -3,7 +3,8 @@ import test from "node:test";
 import vm from "node:vm";
 
 const token = "synthetic-operator-token-for-tests-123";
-Object.assign(process.env, { API_SECRET_TOKEN: token, DATABASE_URL: "", FACTORY_DEMO_MODE: "true", LOG_LEVEL: "silent" });
+const metricsToken = "synthetic-metrics-token-for-tests-123";
+Object.assign(process.env, { API_SECRET_TOKEN: token, METRICS_SECRET_TOKEN: metricsToken, DATABASE_URL: "", FACTORY_DEMO_MODE: "true", LOG_LEVEL: "silent" });
 const { app } = await import("../dist/app.js");
 
 test("operational endpoints require a valid credential", async () => {
@@ -20,6 +21,16 @@ test("operational endpoints require a valid credential", async () => {
   assert.equal(invalid.status, 401);
   assert.equal((await app.request("/health")).status, 200);
   assert.equal((await app.request("/ready")).status, 503);
+});
+
+test("the collector credential only authenticates the Prometheus endpoint", async () => {
+  const headers = { Authorization: "Bearer " + metricsToken };
+  const metrics = await app.request("/metrics", { headers });
+  assert.equal(metrics.status, 503);
+  assert.equal((await metrics.json()).error, "Factory database unavailable");
+  for (const route of ["/", "/api/v1/tasks", "/api/v1/metrics"]) {
+    assert.equal((await app.request(route, { headers })).status, 401);
+  }
 });
 
 test("mutation requests enforce JSON, size and schema limits", async () => {

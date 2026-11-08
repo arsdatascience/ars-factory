@@ -4,6 +4,9 @@ import { config, operatorConfigured } from "./config.js";
 
 const digest = (value: string) => createHash("sha256").update(value).digest();
 const expected = digest(config.apiSecretToken);
+const expectedMetrics = /^[A-Za-z0-9._~-]{32,}$/.test(config.metricsSecretToken)
+  ? digest(config.metricsSecretToken)
+  : undefined;
 
 export const requireOperator = createMiddleware(async (c, next) => {
   c.header("Cache-Control", "no-store");
@@ -19,7 +22,10 @@ export const requireOperator = createMiddleware(async (c, next) => {
     if (credentials.startsWith("operator:")) token = credentials.slice("operator:".length);
   }
 
-  if (!timingSafeEqual(expected, digest(token))) {
+  const tokenDigest = digest(token);
+  const isMetricsReader = c.req.path === "/metrics" && match?.[1].toLowerCase() === "bearer"
+    && expectedMetrics && timingSafeEqual(expectedMetrics, tokenDigest);
+  if (!isMetricsReader && !timingSafeEqual(expected, tokenDigest)) {
     c.header("WWW-Authenticate", c.req.path === "/" ? 'Basic realm="Ars Factory", charset="UTF-8"' : "Bearer");
     return c.json({ error: "Authentication required" }, 401);
   }

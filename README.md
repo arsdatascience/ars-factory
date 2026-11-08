@@ -93,7 +93,7 @@ O dashboard estará disponível em `http://localhost:4001`.
 4. **Build Pack:** `Dockerfile`
 5. **Porta:** `4001`
 6. Configure `DATABASE_URL` e `API_SECRET_TOKEN` como segredos exclusivos de runtime. Use `FACTORY_RUN_MIGRATIONS=true` e `FACTORY_MIGRATION_HOSTS` com os nomes internos autorizados para aplicar as migrações na inicialização antes da prontidão.
-7. Use `/health` para liveness e `/ready` para prontidão. Configure o scrape de `/metrics` com o token em um segredo do Prometheus.
+7. Use `/health` para liveness e `/ready` para prontidão. Configure um `METRICS_SECRET_TOKEN` distinto e use-o no scrape de `/metrics`.
 8. Consulte [a documentação de monitoramento](docs/MONITORING.md).
 
 ## Testes

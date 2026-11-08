@@ -10,6 +10,7 @@ export const config = {
   serviceName: process.env.SERVICE_NAME || "ars-factory",
   serviceVersion: process.env.SERVICE_VERSION || "1.0.0",
   apiSecretToken: process.env.API_SECRET_TOKEN || "",
+  metricsSecretToken: process.env.METRICS_SECRET_TOKEN || "",
   databaseUrl: process.env.DATABASE_URL,
   demoMode: process.env.FACTORY_DEMO_MODE === "true",
   isProduction: (process.env.NODE_ENV || "production") === "production"

@@ -13,6 +13,7 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://factory:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/factory
       - API_SECRET_TOKEN=${API_SECRET_TOKEN:?Set API_SECRET_TOKEN in .env}
+      - METRICS_SECRET_TOKEN=${METRICS_SECRET_TOKEN:-}
       - FACTORY_DEMO_MODE=${FACTORY_DEMO_MODE:-false}
       - FACTORY_RUN_MIGRATIONS=true
       - FACTORY_MIGRATION_HOSTS=postgres

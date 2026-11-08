@@ -34,7 +34,7 @@ A aplicação **Ars Factory** já inclui nativamente os endpoints exigidos pelos
 
 * **Probe de Saúde:** `GET /health` (responde `200 OK` para o Coolify e Uptime Kuma).
 * **Probe de Prontidão:** `GET /ready` verifica configuração de acesso e disponibilidade do esquema de jobs. O campo `mode` identifica consulta ou demonstração.
-* **Prometheus Exporter:** `GET /metrics` aceita autenticação Bearer e exporta métricas no formato Prometheus.
+* **Prometheus Exporter:** `GET /metrics` aceita autenticação Bearer e exporta métricas no formato Prometheus. Configure `METRICS_SECRET_TOKEN` no runtime para dar ao coletor acesso exclusivo a esse endpoint.
   - `ars_factory_uptime_seconds`
   - `ars_factory_tasks_total{status="..."}`
   - `ars_factory_memory_bytes{type="rss|heap_used|heap_total"}`
