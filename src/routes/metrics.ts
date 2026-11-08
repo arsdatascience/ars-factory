@@ -1,13 +1,12 @@
 import { Hono } from "hono";
-import { taskOrchestrator } from "../services/task-orchestrator.js";
-import { robotBuilder } from "../services/robot-builder.js";
+import { jobStats } from "../services/jobs.js";
 import { config } from "../config.js";
 
 export const metricsRoutes = new Hono();
 
 // JSON Metrics for API consumers & Dashboard
-metricsRoutes.get("/api/v1/metrics", (c) => {
-  const taskStats = taskOrchestrator.getStats();
+metricsRoutes.get("/api/v1/metrics", async (c) => {
+  const { tasks, builds } = await jobStats();
   const memory = process.memoryUsage();
   const uptime = Math.floor(process.uptime());
 
@@ -16,13 +15,9 @@ metricsRoutes.get("/api/v1/metrics", (c) => {
     version: config.serviceVersion,
     timestamp: new Date().toISOString(),
     uptimeSeconds: uptime,
-    tasks: taskStats,
-    builds: {
-      total: robotBuilder.listBuilds().length,
-      ready: robotBuilder.listBuilds().filter((b) => b.status === "ready").length,
-      building: robotBuilder.listBuilds().filter((b) => b.status === "building").length,
-      failed: robotBuilder.listBuilds().filter((b) => b.status === "failed").length
-    },
+    mode: config.demoMode ? "demo" : "read-only",
+    tasks,
+    builds,
     system: {
       memory: {
         rssMb: Math.round(memory.rss / 1024 / 1024),
@@ -37,8 +32,8 @@ metricsRoutes.get("/api/v1/metrics", (c) => {
 });
 
 // Prometheus scraping endpoint (/metrics) - compatible with Prometheus & cAdvisor
-metricsRoutes.get("/metrics", (c) => {
-  const taskStats = taskOrchestrator.getStats();
+metricsRoutes.get("/metrics", async (c) => {
+  const { tasks, builds } = await jobStats();
   const memory = process.memoryUsage();
   const uptime = Math.floor(process.uptime());
 
@@ -49,10 +44,16 @@ metricsRoutes.get("/metrics", (c) => {
     ``,
     `# HELP ars_factory_tasks_total Number of factory tasks by status`,
     `# TYPE ars_factory_tasks_total gauge`,
-    `ars_factory_tasks_total{status="completed"} ${taskStats.completed}`,
-    `ars_factory_tasks_total{status="failed"} ${taskStats.failed}`,
-    `ars_factory_tasks_total{status="running"} ${taskStats.activeTasks}`,
-    `ars_factory_tasks_total{status="queued"} ${taskStats.queued}`,
+    `ars_factory_tasks_total{status="completed"} ${tasks.completed}`,
+    `ars_factory_tasks_total{status="failed"} ${tasks.failed}`,
+    `ars_factory_tasks_total{status="running"} ${tasks.activeTasks}`,
+    `ars_factory_tasks_total{status="queued"} ${tasks.queued}`,
+    `ars_factory_tasks_total{status="cancelled"} ${tasks.cancelled}`,
+    `ars_factory_tasks_total{status="simulated"} ${tasks.simulated}`,
+    `# HELP ars_factory_builds Number of factory builds by status`,
+    `# TYPE ars_factory_builds gauge`,
+    `ars_factory_builds{status="queued"} ${builds.queued}`,
+    `ars_factory_builds{status="simulated"} ${builds.simulated}`,
     ``,
     `# HELP ars_factory_memory_bytes Node.js memory consumption`,
     `# TYPE ars_factory_memory_bytes gauge`,
@@ -87,7 +88,7 @@ metricsRoutes.get("/api/v1/monitoring/services", (c) => {
       },
       {
         name: "Terminal & Containers",
-        description: "Terminal interativo e status dos 101 containers",
+        description: "Terminal interativo e status dos containers",
         url: "https://coolify.arsdatascience.com/terminal"
       }
     ],

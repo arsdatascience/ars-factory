@@ -5,11 +5,14 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
+    "predev": "npm run build:css",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && npm run build:css && node -e \"const fs = require('node:fs'); for (const file of fs.readdirSync('src/db').filter(name => name.endsWith('.sql'))) fs.copyFileSync('src/db/' + file, 'dist/db/' + file)\"",
+    "build:css": "tailwindcss --input src/ui.css --output dist/ui.css --content src/ui.ts --minify",
     "start": "node dist/index.js",
+    "migrate": "node dist/db/migrate.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --test"
+    "test": "npm run build && node --test"
   },
   "keywords": [
     "ars-factory",
@@ -22,17 +25,18 @@
   "author": "Ars Data Science <suporte@arsdatascience.com.br>",
   "license": "MIT",
   "dependencies": {
-    "@hono/node-server": "^1.14.2",
+    "@hono/node-server": "^2.1.6",
     "@types/pg": "^8.23.1",
     "dotenv": "^16.4.7",
     "hono": "^4.7.4",
     "pg": "^8.23.1",
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",
-    "zod": "^3.24.2"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "tailwindcss": "^3.4.19",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3"
   }

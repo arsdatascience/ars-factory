@@ -9,9 +9,11 @@ export const config = {
   logLevel: process.env.LOG_LEVEL || "info",
   serviceName: process.env.SERVICE_NAME || "ars-factory",
   serviceVersion: process.env.SERVICE_VERSION || "1.0.0",
-  redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
-  storagePath: process.env.STORAGE_PATH || "./data/artifacts",
   apiSecretToken: process.env.API_SECRET_TOKEN || "",
-  isProduction: process.env.NODE_ENV === "production"
+  databaseUrl: process.env.DATABASE_URL,
+  demoMode: process.env.FACTORY_DEMO_MODE === "true",
+  isProduction: (process.env.NODE_ENV || "production") === "production"
 };
+
+export const operatorConfigured = /^[A-Za-z0-9._~-]{32,}$/.test(config.apiSecretToken);
 

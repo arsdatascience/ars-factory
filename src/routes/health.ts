@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { config } from "../config.js";
-import { taskOrchestrator } from "../services/task-orchestrator.js";
+import { config, operatorConfigured } from "../config.js";
+import { databaseReady } from "../db/index.js";
 
 export const healthRoutes = new Hono();
 
@@ -14,14 +14,14 @@ healthRoutes.get("/health", (c) => {
   });
 });
 
-healthRoutes.get("/ready", (c) => {
-  const stats = taskOrchestrator.getStats();
+healthRoutes.get("/ready", async (c) => {
+  const ready = operatorConfigured && await databaseReady();
   return c.json({
-    ready: true,
+    ready,
     service: config.serviceName,
     environment: config.nodeEnv,
-    activeTasks: stats.activeTasks,
+    mode: config.demoMode ? "demo" : "read-only",
     timestamp: new Date().toISOString()
-  });
+  }, ready ? 200 : 503);
 });
 

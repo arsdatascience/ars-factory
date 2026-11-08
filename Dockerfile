@@ -6,10 +6,10 @@ FROM node:24-bookworm-slim AS builder
 WORKDIR /app
 
 # Copy dependency manifests
-COPY package.json tsconfig.json ./
+COPY package.json package-lock.json tsconfig.json ./
 
 # Install all dependencies (including devDependencies for TypeScript build)
-RUN npm install
+RUN npm ci
 
 # Copy source code
 COPY src ./src
@@ -39,9 +39,6 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 
-# Create storage directory for artifacts
-RUN mkdir -p /app/data/artifacts && chown -R node:node /app
-
 USER node
 
 EXPOSE 4001
@@ -50,5 +47,5 @@ EXPOSE 4001
 HEALTHCHECK --interval=20s --timeout=5s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:4001/health || exit 1
 
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "if [ \"$FACTORY_RUN_MIGRATIONS\" = true ]; then npm run migrate || exit $?; fi; exec node dist/index.js"]
 

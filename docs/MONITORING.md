@@ -33,8 +33,8 @@ O servidor possui um stack completo conteinerizado sob o namespace `uenauovgxbli
 A aplicação **Ars Factory** já inclui nativamente os endpoints exigidos pelos agentes de observabilidade:
 
 * **Probe de Saúde:** `GET /health` (responde `200 OK` para o Coolify e Uptime Kuma).
-* **Probe de Prontidão:** `GET /ready` (verifica se os serviços de fila estão aptos a receber novas tarefas).
-* **Prometheus Exporter:** `GET /metrics` (exporta contadores no formato padrão Prometheus):
+* **Probe de Prontidão:** `GET /ready` verifica configuração de acesso e disponibilidade do esquema de jobs. O campo `mode` identifica consulta ou demonstração.
+* **Prometheus Exporter:** `GET /metrics` aceita autenticação Bearer e exporta métricas no formato Prometheus.
   - `ars_factory_uptime_seconds`
   - `ars_factory_tasks_total{status="..."}`
   - `ars_factory_memory_bytes{type="rss|heap_used|heap_total"}`
@@ -59,22 +59,21 @@ A aplicação **Ars Factory** já inclui nativamente os endpoints exigidos pelos
 
 ## 5. Arquitetura de Cache & Defesa Ativa em Tempo Real (Redis)
 
-Para mitigar o consumo de RAM do Loki e proporcionar reação em sub-milissegundos contra tentativas de invasão, a infraestrutura conta com uma instância dedicada de **Redis Cache** (`redis-monitoring-cache`):
-
-* **Loki Query-Range Cache:** Resultados de consultas pesadas de logs (especialmente auditorias de SSH e Fail2ban) são armazenados em memória no Redis com TTL de 1h, reduzindo pela metade a descompactação de chunks e prevenindo sobrecargas de CPU/RAM.
-* **Tabela de Ameaças & Blacklist Instantânea:** IPs maliciosos detectados em ataques de força bruta são gravados no Redis com expiração (`blacklist:ip:<ip>`). Traefik e middlewares de API realizam verificações $O(1)$ (< 0.2ms) descartando requisições hostis antes que atinjam o banco de dados ou a aplicação.
+O Redis de monitoramento é uma integração externa ao Ars Factory. Cache de consultas do Loki e bloqueio de IPs no proxy dependem da configuração do ambiente. O Compose do Ars Factory usa PostgreSQL para a fila demonstrativa.
 
 ---
 
 ## 6. Persistência de Longo Prazo & Auditoria (TimescaleDB / PostgreSQL)
 
-O banco **`postgresql-database-arsfactory`** (TimescaleDB / PostgreSQL 16) armazena permanentemente os eventos históricos de observabilidade e segurança através das seguintes tabelas estruturadas:
+As migrações criam `factory_jobs` e `factory_job_events`. A gravação de cada mudança de estado faz parte da mesma transação do job e pode ser consultada no endpoint de detalhe.
+
+O schema também provisiona as tabelas abaixo para coletores externos. A ingestão dessas fontes, a sincronização com Redis e a retenção dependem de integrações do ambiente. Habilite a extensão TimescaleDB antes da primeira migração se precisar de hypertables.
 
 1. **`monitoring_logs` (Hypertable):** Armazenamento de logs operacionais agregados indexados por nível, serviço e metadados JSONB.
 2. **`security_threat_events` (Hypertable):** Registro forense de tentativas de invasão, ataques SSH ao root, e falhas de autenticação 401/403.
-3. **`active_blacklisted_ips`:** Catálogo persistente de IPs banidos com contagem de reincidência, severidade e data de expiração, sincronizado com o Redis.
+3. **`active_blacklisted_ips`:** Catálogo de IPs banidos com contagem de reincidência, severidade e expiração.
 4. **`system_metrics_archive` (Hypertable):** Séries temporais históricas consolidadas para relatórios executivos de capacidade e consumo de hardware.
-5. **`rpa_task_audit_logs`:** Rastreabilidade de ponta a ponta da execução de tarefas e robôs pelo Ars Factory.
+5. **`rpa_task_audit_logs`:** Estrutura legada para ingestão de auditoria de executores externos.
 
 ---
 

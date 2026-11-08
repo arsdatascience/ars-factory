@@ -6,22 +6,23 @@ services:
     container_name: ars-factory-app
     restart: unless-stopped
     ports:
-      - "4001:4001"
+      - "127.0.0.1:4001:4001"
     environment:
       - PORT=4001
       - HOST=0.0.0.0
       - NODE_ENV=production
-      - REDIS_URL=redis://ars-factory-redis:6379
-      - STORAGE_PATH=/app/data/artifacts
+      - DATABASE_URL=postgresql://factory:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/factory
+      - API_SECRET_TOKEN=${API_SECRET_TOKEN:?Set API_SECRET_TOKEN in .env}
+      - FACTORY_DEMO_MODE=${FACTORY_DEMO_MODE:-false}
+      - FACTORY_RUN_MIGRATIONS=true
+      - FACTORY_MIGRATION_HOSTS=postgres
       - SERVICE_NAME=ars-factory
       - LOG_LEVEL=info
     depends_on:
-      redis:
+      postgres:
         condition: service_healthy
-    volumes:
-      - factory-artifacts:/app/data/artifacts
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4001/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:4001/ready"]
       interval: 20s
       timeout: 5s
       retries: 3
@@ -29,15 +30,17 @@ services:
     networks:
       - ars-network
 
-  redis:
-    image: redis:7-alpine
-    container_name: ars-factory-redis
+  postgres:
+    image: postgres:16-bookworm
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    environment:
+      POSTGRES_USER: factory
+      POSTGRES_DB: factory
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
-      - factory-redis-data:/data
+      - factory-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "pg_isready", "-U", "factory", "-d", "factory"]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -45,8 +48,7 @@ services:
       - ars-network
 
 volumes:
-  factory-artifacts:
-  factory-redis-data:
+  factory-postgres-data:
 
 networks:
   ars-network:

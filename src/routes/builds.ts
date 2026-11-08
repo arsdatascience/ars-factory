@@ -1,57 +1,39 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { robotBuilder } from "../services/robot-builder.js";
+import { config } from "../config.js";
+import { createJob, getJob, listJobs } from "../services/jobs.js";
+import { jobId, jobInput, jobName, maxOffset, paging } from "./job-input.js";
 
 export const buildRoutes = new Hono();
-
-const createBuildSchema = z.object({
-  name: z.string().min(2, "Robot name must have at least 2 characters"),
+const buildInput = z.object({
+  name: jobName,
   targetPlatform: z.enum(["linux-x64", "win-x64", "docker"]).default("docker"),
-  manifest: z.record(z.unknown()).optional()
+  manifest: jobInput
 });
 
-buildRoutes.get("/builds", (c) => {
-  const builds = robotBuilder.listBuilds();
+buildRoutes.get("/builds", async (c) => {
+  const page = paging.safeParse(c.req.query());
+  if (!page.success) return c.json({ error: "Invalid pagination" }, 400);
+  const { items, nextOffset } = await listJobs("build", page.data.limit, page.data.offset);
   return c.json({
-    count: builds.length,
-    builds
+    count: items.length,
+    builds: items,
+    nextOffset: nextOffset !== null && nextOffset <= maxOffset ? nextOffset : null
   });
 });
 
-buildRoutes.get("/builds/:id", (c) => {
-  const id = c.req.param("id");
-  const build = robotBuilder.getBuild(id);
-  if (!build) {
-    return c.json({ error: "Robot build not found" }, 404);
-  }
-  return c.json(build);
+buildRoutes.get("/builds/:id", async (c) => {
+  const id = jobId.safeParse(c.req.param("id"));
+  const build = id.success && await getJob("build", id.data);
+  return build ? c.json(build) : c.json({ error: "Robot build not found" }, 404);
 });
 
 buildRoutes.post("/builds", async (c) => {
-  try {
-    const body = await c.req.json();
-    const parsed = createBuildSchema.parse(body);
-    const build = robotBuilder.createBuild(parsed.name, parsed.targetPlatform, parsed.manifest || {});
-    return c.json(build, 201);
-  } catch (err: any) {
-    return c.json({ error: err.errors || err.message }, 400);
-  }
+  if (!config.demoMode) return c.json({ error: "Robot compilation is unavailable" }, 503);
+  const build = buildInput.safeParse(await c.req.json());
+  if (!build.success) return c.json({ error: "Invalid build" }, 400);
+  const { name, targetPlatform, manifest } = build.data;
+  return c.json(await createJob("build", name, targetPlatform, manifest), 201);
 });
 
-buildRoutes.get("/builds/:id/artifact", (c) => {
-  const id = c.req.param("id");
-  const build = robotBuilder.getBuild(id);
-  if (!build || build.status !== "ready") {
-    return c.json({ error: "Artifact not ready or not found" }, 404);
-  }
-  return c.json({
-    buildId: build.id,
-    robotName: build.name,
-    version: build.version,
-    platform: build.targetPlatform,
-    sizeMb: build.artifactSizeMb,
-    message: "Artifact available for deployment/download",
-    generatedAt: build.completedAt
-  });
-});
-
+buildRoutes.get("/builds/:id/artifact", (c) => c.json({ error: "Artifact not available" }, 404));

@@ -1,34 +1,16 @@
-export function renderDashboardHtml(): string {
+import { readFileSync } from "node:fs";
+
+const dashboardCss = readFileSync(new URL("../dist/ui.css", import.meta.url), "utf8");
+
+export function renderDashboardHtml(nonce: string, demoMode: boolean): string {
   return `<!DOCTYPE html>
 <html lang="pt-BR" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ars Factory | Mission Control & Observability</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#f5f3ff',
-              500: '#8b5cf6',
-              600: '#7c3aed',
-              700: '#6d28d9',
-              900: '#4c1d95'
-            }
-          }
-        }
-      }
-    }
-  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    body { background-color: #0d1117; color: #c9d1d9; font-family: system-ui, -apple-system, sans-serif; }
-    .glass-card { background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(48, 54, 61, 0.8); backdrop-filter: blur(8px); }
-  </style>
+  <style nonce="${nonce}">${dashboardCss}</style>
 </head>
 <body class="min-h-screen flex flex-col">
   <!-- Topbar -->
@@ -41,17 +23,17 @@ export function renderDashboardHtml(): string {
         <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
           Ars Factory <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">v1.0.0</span>
         </h1>
-        <p class="text-xs text-gray-400">EVEO Cloud Server · Production Orchestrator</p>
+        <p class="text-xs text-gray-400">EVEO Cloud · ${demoMode ? "Modo demonstrativo" : "Somente consulta"}</p>
       </div>
     </div>
     <div class="flex items-center gap-4 text-xs">
       <span class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Sistema Operacional
+        <span id="readiness" role="status">Verificando prontidão…</span>
       </span>
-      <a href="/metrics" target="_blank" class="px-3 py-1.5 rounded-lg glass-card hover:bg-gray-800 transition text-gray-300 flex items-center gap-1.5">
+      <a href="/metrics" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg glass-card hover:bg-gray-800 transition text-gray-300 flex items-center gap-1.5">
         <i class="fa-solid fa-chart-line text-purple-400"></i> Prometheus /metrics
       </a>
-      <a href="/health" target="_blank" class="px-3 py-1.5 rounded-lg glass-card hover:bg-gray-800 transition text-gray-300 flex items-center gap-1.5">
+      <a href="/health" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg glass-card hover:bg-gray-800 transition text-gray-300 flex items-center gap-1.5">
         <i class="fa-solid fa-heart-pulse text-emerald-400"></i> Healthcheck
       </a>
     </div>
@@ -63,7 +45,7 @@ export function renderDashboardHtml(): string {
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div class="glass-card rounded-xl p-4 flex items-center justify-between">
         <div>
-          <p class="text-xs text-gray-400 font-medium">Tarefas Concluídas</p>
+          <p class="text-xs text-gray-400 font-medium">Tarefas Simuladas</p>
           <p class="text-2xl font-bold text-white mt-1" id="kpi-completed">--</p>
         </div>
         <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
@@ -72,7 +54,7 @@ export function renderDashboardHtml(): string {
       </div>
       <div class="glass-card rounded-xl p-4 flex items-center justify-between">
         <div>
-          <p class="text-xs text-gray-400 font-medium">Tarefas em Execução</p>
+          <p class="text-xs text-gray-400 font-medium">Tarefas na Fila</p>
           <p class="text-2xl font-bold text-purple-400 mt-1" id="kpi-active">--</p>
         </div>
         <div class="w-10 h-10 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
@@ -81,7 +63,7 @@ export function renderDashboardHtml(): string {
       </div>
       <div class="glass-card rounded-xl p-4 flex items-center justify-between">
         <div>
-          <p class="text-xs text-gray-400 font-medium">Robôs Compilados</p>
+          <p class="text-xs text-gray-400 font-medium">Builds Simulados</p>
           <p class="text-2xl font-bold text-indigo-400 mt-1" id="kpi-builds">--</p>
         </div>
         <div class="w-10 h-10 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
@@ -109,17 +91,17 @@ export function renderDashboardHtml(): string {
           <p class="text-xs text-gray-400 mt-1">Acesso direto aos painéis de telemetria, métricas de frota e logs da infraestrutura EVEO.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <a href="https://coolify.arsdatascience.com/metrics" target="_blank" class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium flex items-center gap-1.5 transition">
+          <a href="https://coolify.arsdatascience.com/metrics" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium flex items-center gap-1.5 transition">
             <i class="fa-solid fa-chart-simple"></i> Fleet Metrics
           </a>
-          <a href="https://coolify.arsdatascience.com/analytics" target="_blank" class="px-3 py-1.5 rounded-lg glass-card hover:bg-gray-800 text-white text-xs font-medium flex items-center gap-1.5 transition">
+          <a href="https://coolify.arsdatascience.com/analytics" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg glass-card hover:bg-gray-800 text-white text-xs font-medium flex items-center gap-1.5 transition">
             <i class="fa-solid fa-globe"></i> HTTP Analytics
           </a>
-          <a href="https://coolify.arsdatascience.com/server/7p5nfb1vwriy7toqq7usgiea/sentinel" target="_blank" class="px-3 py-1.5 rounded-lg glass-card hover:bg-gray-800 text-white text-xs font-medium flex items-center gap-1.5 transition">
+          <a href="https://coolify.arsdatascience.com/server/7p5nfb1vwriy7toqq7usgiea/sentinel" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg glass-card hover:bg-gray-800 text-white text-xs font-medium flex items-center gap-1.5 transition">
             <i class="fa-solid fa-shield-halved"></i> Host Sentinel
           </a>
-          <a href="https://coolify.arsdatascience.com/terminal" target="_blank" class="px-3 py-1.5 rounded-lg glass-card hover:bg-gray-800 text-white text-xs font-medium flex items-center gap-1.5 transition">
-            <i class="fa-solid fa-terminal"></i> Terminal 101 Containers
+          <a href="https://coolify.arsdatascience.com/terminal" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg glass-card hover:bg-gray-800 text-white text-xs font-medium flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-terminal"></i> Terminal e containers
           </a>
         </div>
       </div>
@@ -155,9 +137,7 @@ export function renderDashboardHtml(): string {
           <h3 class="text-sm font-bold text-white flex items-center gap-2">
             <i class="fa-solid fa-list-check text-purple-400"></i> Fila de Tarefas da Fábrica
           </h3>
-          <button onclick="triggerNewTask()" class="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium transition flex items-center gap-1.5">
-            <i class="fa-solid fa-plus"></i> Nova Tarefa
-          </button>
+          ${demoMode ? '<button id="new-task" class="px-3 py-1 rounded-lg bg-purple-600 text-white text-xs">Simular tarefa</button>' : ""}
         </div>
         <div id="tasks-container" class="space-y-2 max-h-96 overflow-y-auto pr-1">
           <!-- Loaded via JS -->
@@ -169,11 +149,9 @@ export function renderDashboardHtml(): string {
       <div class="glass-card rounded-xl p-5 space-y-4">
         <div class="flex justify-between items-center">
           <h3 class="text-sm font-bold text-white flex items-center gap-2">
-            <i class="fa-solid fa-box-archive text-indigo-400"></i> Compilador & Pacotes de Robôs RPA
+            <i class="fa-solid fa-box-archive text-indigo-400"></i> Histórico de Builds RPA
           </h3>
-          <button onclick="triggerNewBuild()" class="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition flex items-center gap-1.5">
-            <i class="fa-solid fa-hammer"></i> Compilar Robô
-          </button>
+          ${demoMode ? '<button id="new-build" class="px-3 py-1 rounded-lg bg-indigo-600 text-white text-xs">Simular build</button>' : ""}
         </div>
         <div id="builds-container" class="space-y-2 max-h-96 overflow-y-auto pr-1">
           <!-- Loaded via JS -->
@@ -181,6 +159,7 @@ export function renderDashboardHtml(): string {
         </div>
       </div>
     </div>
+    <p id="action-status" role="status" class="text-sm text-gray-300"></p>
   </main>
 
   <!-- Footer -->
@@ -188,111 +167,81 @@ export function renderDashboardHtml(): string {
     Ars Factory · Intelligent RPA & Agentic Orchestration Engine · Servidor EVEO Cloud
   </footer>
 
-  <script>
+  <script nonce="${nonce}">
+    const statusLabels = { queued: 'Na fila', simulated: 'Simulado', cancelled: 'Cancelado' };
+    const byId = (id) => document.getElementById(id);
+
+    async function getJson(path) {
+      const response = await fetch(path);
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      return response.json();
+    }
+
     async function loadMetrics() {
       try {
-        const res = await fetch('/api/v1/metrics');
-        const data = await res.json();
-        document.getElementById('kpi-completed').innerText = data.tasks.completed;
-        document.getElementById('kpi-active').innerText = data.tasks.activeTasks;
-        document.getElementById('kpi-builds').innerText = data.builds.total;
-        document.getElementById('kpi-memory').innerText = data.system.memory.rssMb + ' MB';
-      } catch (e) {
-        console.error(e);
+        const data = await getJson('/api/v1/metrics');
+        byId('kpi-completed').textContent = data.tasks.simulated;
+        byId('kpi-active').textContent = data.tasks.queued;
+        byId('kpi-builds').textContent = data.builds.simulated;
+        byId('kpi-memory').textContent = data.system.memory.rssMb + ' MB';
+        byId('readiness').textContent = 'Consulta disponível';
+      } catch {
+        for (const id of ['kpi-completed', 'kpi-active', 'kpi-builds', 'kpi-memory']) byId(id).textContent = '—';
+        byId('readiness').textContent = 'Dados indisponíveis';
       }
     }
 
-    async function loadTasks() {
+    function jobCard(job, target) {
+      const card = document.createElement('div');
+      card.className = 'p-3 rounded-lg bg-gray-900/60 border border-gray-800/80';
+      const title = document.createElement('strong');
+      title.className = 'text-xs font-semibold text-white';
+      title.textContent = job.name;
+      const details = document.createElement('p');
+      details.className = 'text-[11px] text-gray-400 mt-1 font-mono';
+      details.textContent = [statusLabels[job.status] || job.status, target, job.id].join(' · ');
+      card.append(title, details);
+      return card;
+    }
+
+    async function loadJobs(kind, targetField) {
+      const container = byId(kind + '-container');
       try {
-        const res = await fetch('/api/v1/tasks');
-        const data = await res.json();
-        const container = document.getElementById('tasks-container');
-        if (!data.tasks.length) {
-          container.innerHTML = '<div class="text-xs text-gray-500 py-4 text-center">Nenhuma tarefa registrada.</div>';
-          return;
-        }
-        container.innerHTML = data.tasks.map(t => \`
-          <div class="p-3 rounded-lg bg-gray-900/60 border border-gray-800/80 flex justify-between items-start">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold text-white">\${t.name}</span>
-                <span class="text-[10px] px-1.5 py-0.5 rounded uppercase font-mono \${
-                  t.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                  t.status === 'running' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                  'bg-gray-800 text-gray-400'
-                }">\${t.status}</span>
-              </div>
-              <p class="text-[11px] text-gray-400 mt-1 font-mono">ID: \${t.id} · Tipo: \${t.type}</p>
-            </div>
-            <span class="text-[10px] text-gray-500">\${t.durationMs ? t.durationMs + 'ms' : ''}</span>
-          </div>
-        \`).join('');
-      } catch (e) {
-        console.error(e);
+        const data = await getJson('/api/v1/' + kind);
+        const cards = data[kind].map(job => jobCard(job, job[targetField]));
+        container.replaceChildren(...cards);
+        if (cards.length === 0) container.textContent = 'Nenhum registro.';
+      } catch {
+        container.textContent = 'Histórico indisponível.';
       }
     }
 
-    async function loadBuilds() {
+    async function refresh() {
+      await Promise.all([loadMetrics(), loadJobs('tasks', 'type'), loadJobs('builds', 'targetPlatform')]);
+      setTimeout(refresh, 5000);
+    }
+
+    async function submitDemo(kind, label) {
+      const name = prompt(label);
+      if (!name) return;
+      const status = byId('action-status');
       try {
-        const res = await fetch('/api/v1/builds');
-        const data = await res.json();
-        const container = document.getElementById('builds-container');
-        if (!data.builds.length) {
-          container.innerHTML = '<div class="text-xs text-gray-500 py-4 text-center">Nenhum pacote compilado.</div>';
-          return;
-        }
-        container.innerHTML = data.builds.map(b => \`
-          <div class="p-3 rounded-lg bg-gray-900/60 border border-gray-800/80 flex justify-between items-start">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold text-white">\${b.name}</span>
-                <span class="text-[10px] px-1.5 py-0.5 rounded uppercase font-mono \${
-                  b.status === 'ready' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                  'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                }">\${b.status}</span>
-              </div>
-              <p class="text-[11px] text-gray-400 mt-1 font-mono">Plataforma: \${b.targetPlatform} · Tam: \${b.artifactSizeMb ? b.artifactSizeMb + ' MB' : '--'}</p>
-            </div>
-            \${b.downloadUrl ? \`<a href="\${b.downloadUrl}" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">Download</a>\` : ''}
-          </div>
-        \`).join('');
-      } catch (e) {
-        console.error(e);
+        const response = await fetch('/api/v1/' + kind, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        status.textContent = 'Simulação enfileirada.';
+      } catch (error) {
+        status.textContent = 'Falha ao enfileirar a simulação. ' + error.message;
       }
     }
 
-    async function triggerNewTask() {
-      const name = prompt('Nome da tarefa a executar:', 'RPA Fiscal Automated Audit');
-      if (!name) return;
-      await fetch('/api/v1/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, type: 'rpa' })
-      });
-      loadTasks();
-      loadMetrics();
-    }
-
-    async function triggerNewBuild() {
-      const name = prompt('Nome do Robô a compilar:', 'Robot Coleta de Prontuários');
-      if (!name) return;
-      await fetch('/api/v1/builds', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, targetPlatform: 'docker' })
-      });
-      loadBuilds();
-      loadMetrics();
-    }
-
-    loadMetrics();
-    loadTasks();
-    loadBuilds();
-    setInterval(loadMetrics, 5000);
-    setInterval(loadTasks, 5000);
-    setInterval(loadBuilds, 5000);
+    byId('new-task')?.addEventListener('click', () => submitDemo('tasks', 'Nome da tarefa de demonstração'));
+    byId('new-build')?.addEventListener('click', () => submitDemo('builds', 'Nome do build de demonstração'));
+    refresh();
   </script>
 </body>
 </html>`;
 }
-

@@ -506,7 +506,7 @@ dpkg-reconfigure -f noninteractive unattended-upgrades
 ---
 
 ### FASE 6: Backups Imutáveis Anti-Ransomware com Restic (`AES-256-CTR-Poly1305`), `flock` e Extração Segura de Bancos
-Esta fase configura o Restic com chave criptográfica de 384 bits (48 bytes em Base64) resistente ao Algoritmo de Grover, extrai dumps de bancos **sem expor senhas na linha de comando (`ps aux`)**, verifica se os dumps não estão vazios e opera em modo **Append-Only** no servidor (evitando que um atacante com acesso `root` use `--prune` para destruir backups históricos em buckets protegidos por **S3 Object Lock**).
+Esta fase gera a senha do repositório com 48 bytes aleatórios, extrai dumps dos bancos inventariados e envia um snapshot ao Restic. A proteção contra exclusão e sobrescrita precisa ser aplicada no destino, com credenciais de backup separadas das credenciais de manutenção. Valide o acesso, a retenção e a restauração em ambiente isolado antes de registrar o controle como ativo.
 
 ```bash
 #!/usr/bin/env bash
@@ -518,26 +518,22 @@ restic self-update || true
 mkdir -p /etc/restic
 chmod 700 /etc/restic
 
-# Gera chave mestra de 384 bits de entropia se ainda não existir
+# Gera uma senha aleatória de 48 bytes se ainda não existir
 if [[ ! -f /etc/restic/repo.pw ]]; then
     openssl rand -base64 48 > /etc/restic/repo.pw
     chmod 600 /etc/restic/repo.pw
-    echo "=================================================================="
-    echo "ATENÇÃO CRÍTICA: COPIE A CHAVE MESTRA DO RESTIC ABAIXO E SALVE NO"
-    echo "SEU COFRE DE SENHAS PESSOAL (BITWARDEN / 1PASSWORD) IMEDIATAMENTE:"
-    cat /etc/restic/repo.pw
-    echo "=================================================================="
+    echo "Guarde /etc/restic/repo.pw em um cofre externo por um canal seguro."
 fi
 
 if [[ ! -f /etc/restic/env ]]; then
     cat << 'EOF' > /etc/restic/env
-# IMPORTANTE: Ative o S3 Object Lock (Modo Compliance) no bucket R2/S3/B2
-# e utilize credenciais S3 com permissão Append-Only (sem s3:DeleteObject) neste servidor.
-export RESTIC_REPOSITORY="s3:https://<ACCOUNT_ID>[.r2.cloudflarestorage.com/coolify-pqc-backups](https://.r2.cloudflarestorage.com/coolify-pqc-backups)"
+# Configure a retenção/append-only no backend e valide o ciclo de locks do Restic.
+export RESTIC_REPOSITORY="s3:https://ENDPOINT/BUCKET"
 export RESTIC_PASSWORD_FILE="/etc/restic/repo.pw"
 export AWS_ACCESS_KEY_ID="PREENCHA_SUA_ACCESS_KEY"
 export AWS_SECRET_ACCESS_KEY="PREENCHA_SUA_SECRET_KEY"
-export RESTIC_ENABLE_PRUNE="false"
+# Nomes exatos dos containers de banco que devem produzir dumps, separados por espaços.
+export BACKUP_REQUIRED_DB_CONTAINERS=""
 EOF
     chmod 600 /etc/restic/env
 fi
@@ -565,7 +561,7 @@ cleanup_and_alert() {
     if [[ $exit_code -ne 0 ]]; then
         local msg="🚨 [ERRO CRÍTICO] Falha na execução do Backup PQC (Restic) em $(hostname -f 2>/dev/null || hostname)!"
         if [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]]; then
-            curl -sS -X POST "[https://api.telegram.org/bot$](https://api.telegram.org/bot$){TELEGRAM_BOT_TOKEN}/sendMessage" \
+            curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
                 -d "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${msg}" >/dev/null || true
         fi
         if [[ -n "${WEBHOOK_URL:-}" ]]; then
@@ -578,18 +574,24 @@ trap cleanup_and_alert EXIT
 mkdir -p "$APPS_DB_DIR"
 chmod -R 700 "$BACKUP_STAGE"
 
-echo "[1/5] Extraindo dumps consistentes dos bancos de dados Docker/Coolify (Zero CLI Password Leak)..."
-for CID in $(docker ps -q); do
+echo "[1/4] Extraindo dumps dos bancos de dados Docker/Coolify..."
+read -r -a REQUIRED_DB <<< "${BACKUP_REQUIRED_DB_CONTAINERS:-}"
+(( ${#REQUIRED_DB[@]} > 0 )) || { echo "[ERRO] Configure BACKUP_REQUIRED_DB_CONTAINERS."; exit 1; }
+CONTAINER_IDS=$(docker ps -q) || { echo "[ERRO] Falha ao listar containers."; exit 1; }
+[[ -n "$CONTAINER_IDS" ]] || { echo "[ERRO] Nenhum container em execução."; exit 1; }
+declare -A DUMPED_DB=()
+while IFS= read -r CID; do
     CNAME=$(docker inspect --format '{{.Name}}' "$CID" | sed 's/^\///')
     CIMAGE=$(docker inspect --format '{{.Config.Image}}' "$CID")
 
-    # PostgreSQL / PostGIS / pgvector
-    if echo "$CIMAGE" | grep -qiE "postgres|postgis|pgvector"; then
+    # PostgreSQL / PostGIS / pgvector / TimescaleDB
+    if echo "$CIMAGE" | grep -qiE "postgres|postgis|pgvector|timescale"; then
         echo "  -> PostgreSQL: ${CNAME}"
         OUT_FILE="${APPS_DB_DIR}/pg_${CNAME}.sql.gz"
         docker exec "$CID" sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dumpall -U "${POSTGRES_USER:-postgres}" --clean' \
             | gzip -9 > "$OUT_FILE"
         [[ $(stat -c%s "$OUT_FILE") -gt 64 ]] || { echo "[ERRO] Dump vazio para ${CNAME}"; exit 1; }
+        DUMPED_DB["$CNAME"]=1
     fi
 
     # MySQL / MariaDB (Usa MYSQL_PWD em vez de -p na CLI para ocultar senha do ps aux)
@@ -602,6 +604,7 @@ for CID in $(docker ps -q); do
             $DUMP_BIN -u root --all-databases --single-transaction --quick --lock-tables=false
         ' | gzip -9 > "$OUT_FILE"
         [[ $(stat -c%s "$OUT_FILE") -gt 64 ]] || { echo "[ERRO] Dump vazio para ${CNAME}"; exit 1; }
+        DUMPED_DB["$CNAME"]=1
     fi
 
     # MongoDB (Usa arquivo de configuração efêmero em memória /dev/shm para não expor senha no ps aux)
@@ -609,17 +612,19 @@ for CID in $(docker ps -q); do
         echo "  -> MongoDB: ${CNAME}"
         OUT_FILE="${APPS_DB_DIR}/mongo_${CNAME}.archive.gz"
         docker exec "$CID" sh -c '
+            set -eu
             if [ -n "${MONGO_INITDB_ROOT_USERNAME:-}" ]; then
                 CFG=$(mktemp /dev/shm/mongo.XXXXXX)
+                trap "rm -f \"$CFG\"" EXIT
                 chmod 600 "$CFG"
                 printf "password: \"%s\"\n" "$MONGO_INITDB_ROOT_PASSWORD" > "$CFG"
                 mongodump --username "$MONGO_INITDB_ROOT_USERNAME" --config "$CFG" --authenticationDatabase admin --archive --gzip
-                rm -f "$CFG"
             else
                 mongodump --archive --gzip
             fi
         ' > "$OUT_FILE"
         [[ $(stat -c%s "$OUT_FILE") -gt 64 ]] || { echo "[ERRO] Dump vazio para ${CNAME}"; exit 1; }
+        DUMPED_DB["$CNAME"]=1
     fi
 
     # Redis / Valkey / Dragonfly / KeyDB (Usa REDISCLI_AUTH em vez de -a na CLI)
@@ -627,16 +632,25 @@ for CID in $(docker ps -q); do
         echo "  -> Redis/Cache: ${CNAME}"
         OUT_FILE="${APPS_DB_DIR}/redis_${CNAME}.rdb.gz"
         docker exec "$CID" sh -c '
+            set -eu
             export REDISCLI_AUTH="${REDIS_PASSWORD:-}"
-            redis-cli --rdb /dev/shm/dump.rdb >/dev/null 2>&1
-            cat /dev/shm/dump.rdb && rm -f /dev/shm/dump.rdb
+            DUMP=$(mktemp /dev/shm/redis.XXXXXX)
+            trap "rm -f \"$DUMP\"" EXIT
+            redis-cli --rdb "$DUMP" >/dev/null
+            test -s "$DUMP"
+            cat "$DUMP"
         ' | gzip -9 > "$OUT_FILE"
         [[ $(stat -c%s "$OUT_FILE") -gt 20 ]] || { echo "[ERRO] Dump Redis inválido para ${CNAME}"; exit 1; }
+        DUMPED_DB["$CNAME"]=1
     fi
+done <<< "$CONTAINER_IDS"
+
+for CNAME in "${REQUIRED_DB[@]}"; do
+    [[ "${DUMPED_DB[$CNAME]:-}" == 1 ]] || { echo "[ERRO] Dump obrigatório ausente: ${CNAME}"; exit 1; }
 done
 
-echo "[2/5] Inicializando repositório (se necessário) e enviando backup em AES-256-CTR-Poly1305..."
-restic cat config >/dev/null 2>&1 || restic init
+echo "[2/4] Verificando acesso ao repositório e enviando snapshot..."
+restic cat config >/dev/null
 
 restic backup \
     "$BACKUP_STAGE" \
@@ -652,22 +666,10 @@ restic backup \
     --tag "coolify-pqc" \
     --exclude-caches
 
-echo "[3/5] Limpando área de staging local..."
+echo "[3/4] Limpando área de staging local..."
 rm -rf "${BACKUP_STAGE:?}/"*
 
-echo "[4/5] Verificando política Anti-Ransomware (Append-Only vs Prune)..."
-if [[ "${RESTIC_ENABLE_PRUNE:-false}" == "true" ]]; then
-    restic forget \
-        --tag "coolify-pqc" \
-        --keep-daily 7 \
-        --keep-weekly 4 \
-        --keep-monthly 6 \
-        --prune
-else
-    echo "  -> Modo Append-Only ativo (RESTIC_ENABLE_PRUNE=false). Snapshots antigos preservados contra deleção."
-fi
-
-echo "[5/5] Verificando integridade criptográfica de amostra de 2% dos blocos..."
+echo "[4/4] Verificando integridade criptográfica de amostra de 2% dos blocos..."
 restic check --read-data-subset=2%
 
 echo "Backup Pós-Quântico concluído com sucesso!"
@@ -676,6 +678,8 @@ EOF
 chmod +x /usr/local/bin/backup-pqc.sh
 echo "0 3 * * * root /usr/local/bin/backup-pqc.sh >> /var/log/restic-backup.log 2>&1" > /etc/cron.d/restic-pqc
 ```
+
+Antes de ativar o agendamento, inicialize o repositório em uma sessão de manutenção autorizada e preencha o inventário. Mantenha `forget` e `prune` em um ambiente de manutenção separado, com credenciais próprias. Registre a idade do último snapshot e o resultado de uma restauração isolada de cada banco obrigatório.
 
 ---
 
@@ -803,7 +807,8 @@ if [[ -f /etc/restic/repo.pw && -f /etc/restic/env ]]; then
     if grep -q "PREENCHA_SUA_ACCESS_KEY" /etc/restic/env 2>/dev/null; then
         echo -e "  ${YELLOW}[AVISO]${NC} Credenciais S3 do Restic ainda estão com valores de template em /etc/restic/env."
     else
-        echo -e "  ${GREEN}[OK]${NC} Repositório e chave mestra Restic (384-bit) configurados."
+        echo -e "  ${GREEN}[OK]${NC} Arquivos locais de configuração do Restic presentes."
+        echo -e "  ${YELLOW}[INFO]${NC} Verifique separadamente o último snapshot, a retenção no destino e o último ensaio de restauração."
     fi
 else
     echo -e "  ${RED}[ALERTA]${NC} Configuração do Restic ausente em /etc/restic!"
@@ -1201,7 +1206,7 @@ systemctl enable --now hermes-wake-gate.timer
 Após concluir as Fases 0 a 8, execute `/usr/local/bin/audit-pqc.sh` e apresente ao usuário:
 1. O resultado completo da auditoria com todos os indicadores em `[OK]`.
 2. O status do timer `hermes-wake-gate.timer` e a confirmação de que os três perfis (`scout`, `analyst`, `briefer`) estão isolados em `/etc/hermes-observability/profiles/` com container sandbox `--read-only` e `--cap-drop=ALL`.
-3. A confirmação da chave mestra gerada em `/etc/restic/repo.pw` (lembrando o usuário de salvá-la fora do servidor, em cofre pessoal) e a instrução de ativar **Object Lock (Modo Compliance)** no bucket S3/R2.
+3. A confirmação de custódia externa da senha do repositório e a evidência de retenção aplicada no destino. Inclua o ID e a idade do último snapshot e o resultado do ensaio de restauração.
 4. O lembrete para ativar **Authenticated Origin Pulls** no painel da Cloudflare (`SSL/TLS -> Origin Server -> Authenticated Origin Pulls`) apontando para `/data/coolify/mtls/cloudflare-origin-pull-ca.pem`.
 5. O caminho do diretório de rollback criado na Fase 0 (`/root/pqc-rollback-...`).
 
@@ -1210,17 +1215,17 @@ Após concluir as Fases 0 a 8, execute `/usr/local/bin/audit-pqc.sh` e apresente
 ## 5. ANEXO DE REFERÊNCIA: PLAYBOOK DE DISASTER RECOVERY (BARE-METAL RESTORE)
 Caso este prompt seja acionado em modo de **Recuperação de Desastre** em um servidor Ubuntu 24.04 recém-formatado:
 1. Instale `curl wget git jq restic wireguard-tools rosenpass` e recrie `/etc/restic/repo.pw` e `/etc/restic/env`.
-2. Restaure a estrutura, os agentes Hermes e a `APP_KEY` original **antes** de instalar o Coolify:
+2. Identifique o snapshot por ID, com o host e a tag `coolify-pqc` esperados. Primeiro faça um ensaio com destino separado e valide os dumps em instâncias descartáveis. Na recuperação do host novo, restaure a estrutura, os agentes Hermes e a `APP_KEY` original **antes** de instalar o Coolify:
    ```bash
    source /etc/restic/env
-   restic restore latest --target / \
+   restic restore "${SNAPSHOT_ID:?Defina o ID do snapshot verificado}" --target / \
        --include /data/coolify \
        --include /etc/wireguard \
        --include /etc/rosenpass \
        --include /etc/hermes-observability \
        --include /var/backups/pqc-stage
    ```
-3. Confirme que `grep "^APP_KEY=" /data/coolify/source/.env` retorna a chave original.
+3. Compare a `APP_KEY` de forma privada com a cópia do cofre e registre apenas o resultado.
 4. Instale o Coolify (`curl -fsSL https://cdn.coollabs.io/coolify/install.sh | sudo bash`).
-5. Pare os containers de aplicação do painel (`docker stop coolify coolify-realtime`), injete o dump do banco interno (`zcat /var/backups/pqc-stage/apps-db/pg_coolify-db.sql.gz | docker exec -i coolify-db psql -U coolify -d coolify`) e inicie novamente (`docker start coolify coolify-realtime`).
+5. Pare os containers de aplicação do painel (`docker stop coolify coolify-realtime`). Para o dump de cluster criado com `pg_dumpall --clean`, use um banco de manutenção separado dos bancos alvo e habilite `ON_ERROR_STOP` no `psql`. Resolva erros de roles e bancos na restauração isolada antes de iniciar o painel novamente.
 6. Faça o redeploy das aplicações pelo painel e restaure os dumps individuais localizados em `/var/backups/pqc-stage/apps-db/`.

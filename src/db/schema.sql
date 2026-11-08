@@ -3,7 +3,7 @@
 -- Database: postgresql-database-arsfactory (TimescaleDB / PostgreSQL 16)
 -- ============================================================================
 
-CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+-- Optional on PostgreSQL. Install the extension separately where TimescaleDB is used.
 
 -- 1. TABELA PERSISTENTE DE LOGS DE MONITORAMENTO E SISTEMA
 CREATE TABLE IF NOT EXISTS monitoring_logs (
