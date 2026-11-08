@@ -1,0 +1,12 @@
+[Unit]
+Description=Ajuste de Janela Inicial TCP (initcwnd 20) para Handshakes PQC em 1-RTT
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/pqc-set-initcwnd.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
