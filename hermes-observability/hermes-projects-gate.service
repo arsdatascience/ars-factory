@@ -1,0 +1,15 @@
+[Unit]
+Description=Hermes Dedicated Project Keepers Gate
+After=network.target docker.service hermes-wake-gate.service
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=-/etc/hermes-observability/hermes.env
+ExecStart=/usr/local/bin/hermes-projects-gate.sh
+TimeoutSec=300
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

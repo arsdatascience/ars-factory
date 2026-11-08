@@ -1,0 +1,11 @@
+[Unit]
+Description=Timer for Hermes Dedicated Project Keepers (Every 5 minutes, offset 2min)
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -29,3 +29,4 @@ REGRAS DE SEGURANÇA E ENGENHARIA FORENSE:
   "rollback_safety": "Baixo risco / Sem parada de serviço / Seguro para execução imediata",
   "technical_details_for_briefer": "Explicação clara e objetiva para elaboração do boletim executivo"
 }
+

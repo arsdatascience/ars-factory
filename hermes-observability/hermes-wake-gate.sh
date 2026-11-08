@@ -130,3 +130,4 @@ if [[ -f /usr/local/bin/hermes-multiagent-runner.py ]]; then
 elif [[ -f ./hermes-multiagent-runner.py ]]; then
     python3 ./hermes-multiagent-runner.py "$SNAPSHOT_FILE"
 fi
+

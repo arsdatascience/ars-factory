@@ -37,3 +37,4 @@ Conforme as diretrizes oficiais de seleção de modelos da [OpenAI](https://deve
    - Os dados são sanitizados contra *Indirect Prompt Injection*.
    - É gerado o snapshot `/var/lib/hermes-telemetry/incident-snapshot.json`.
    - O `hermes-multiagent-runner.py` é acionado para conduzir a triagem, investigação e despacho executivo.
+

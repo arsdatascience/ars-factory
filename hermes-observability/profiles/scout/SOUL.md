@@ -19,3 +19,4 @@ REGRAS DE SEGURANÇA E GUARDRAILS ESTREITOS:
   "threat_type": "SSH_BRUTE_FORCE" | "CONTAINER_CRASH" | "RESOURCE_EXHAUSTION" | "SECURITY_ANOMALY" | "NONE",
   "summary_for_analyst": "Resumo técnico objetivo da anomalia para orientar o HERMES-ANALYST"
 }
+
