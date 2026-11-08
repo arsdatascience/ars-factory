@@ -1,0 +1,13 @@
+[Unit]
+Description=Post-Quantum Cloudflare and Admin IPSet Initializer
+DefaultDependencies=no
+Before=network-pre.target ufw.service docker.service
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/update-cloudflare-ufw.sh
+
+[Install]
+WantedBy=multi-user.target
