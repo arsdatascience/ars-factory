@@ -100,3 +100,22 @@ O dashboard estará disponível em `http://localhost:4001`.
 
 `npm test` compila o projeto e executa os testes de segurança. Para incluir migração, histórico, cancelamento e reinício, defina `TEST_DATABASE_URL` para um banco de teste que permita criar e remover schemas isolados. A CI fornece PostgreSQL 16.
 
+---
+
+## 🛡️ Segurança Defensiva, Zero-Trust & Criptografia Pós-Quântica (PQC Enterprise v3.0)
+
+O servidor de produção na EVEO Cloud (`177.104.141.223`) e os seus 5 ecossistemas de projetos (*Ars Factory, Cidade do Agro, ContDigital, Sistema Insight, Tempo Agro*) operam sob uma arquitetura de **Zero-Trust** e **Criptografia Pós-Quântica (PQC)** em conformidade com o padrão **NIST FIPS 203**.
+
+### 🌟 Pilares da Blindagem Cibernética
+* 🛡️ **Borda Cloudflare PQC:** TLS 1.3 híbrido com troca de chaves **`X25519MLKEM768` (Kyber)**, HTTP/3 QUIC e modo *Full (strict)*.
+* 🔐 **mTLS Authenticated Origin Pulls (AOP):** Handshake mútuo garantindo que apenas a Cloudflare consiga se comunicar com o Traefik.
+* 🚫 **Firewall Anti-Bypass (`DOCKER-USER`):** Conexões diretas às portas 80/443 no IP do servidor são descartadas; apenas tráfego vindo da Cloudflare é aceito.
+* 🔑 **OpenSSH PQC Hardening:** Porta administrativa `2247` com KEX **`sntrup761x25519`**, cifras simétricas de 256 bits, moduli Diffie-Hellman fracos purgados e `PasswordAuthentication no` (login exclusivamente por chave pública).
+* 🚨 **CrowdSec IPS:** Bouncer ativo na chain `DOCKER-USER` com detecção e banimento automatizado de atacantes.
+* 🚀 **Kernel BBR & TCP PQC Tuning:** Controle de congestionamento Google BBR, buffers de 32 MB e `initcwnd 20` para eliminação de latência em handshakes PQC.
+* 📦 **Backups Imutáveis Offsite:** 16 bancos de dados salvos diariamente no **Cloudflare R2** com Restic criptografado (AES-256 + Poly1305) acionado via `pqc-backup.timer`.
+* 🤖 **Malha Multiagêntica Hermes:** Guardiões autônomos de integridade monitorando os 5 projetos em tempo real.
+
+📖 **Documentação Completa:** Consulte a [Matriz de Proteção contra Ataques Cibernéticos & Arquitetura PQC Enterprise v3.0](docs/SECURITY_PQC_ZERO_TRUST.md).
+
+
